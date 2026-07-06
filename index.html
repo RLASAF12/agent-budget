@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentBudget — Real-Time Token Spend Guardrail</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2430;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .header h1 span { color: var(--red); }
+  .header .tagline {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--red);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* Layout */
+  .grid { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  /* Panels */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .panel-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--blue);
+  }
+
+  /* Config */
+  .config-row {
+    margin-bottom: 14px;
+  }
+  .config-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .config-label span { color: var(--text); font-weight: 600; }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--blue);
+    height: 4px;
+    cursor: pointer;
+  }
+  .config-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .config-input:focus { border-color: var(--blue); }
+
+  select.config-input {
+    cursor: pointer;
+  }
+
+  /* Guardrail meters */
+  .guardrail {
+    margin-bottom: 14px;
+  }
+  .guardrail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+    font-size: 12px;
+  }
+  .guardrail-name { color: var(--muted); }
+  .guardrail-value { font-weight: 600; font-size: 13px; }
+  .bar-track {
+    background: var(--surface2);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease, background 0.4s ease;
+    position: relative;
+  }
+  .bar-fill.safe { background: var(--green); }
+  .bar-fill.warn { background: var(--yellow); }
+  .bar-fill.danger { background: var(--orange); }
+  .bar-fill.critical {
+    background: var(--red);
+    box-shadow: 0 0 8px rgba(239,68,68,0.5);
+  }
+  .bar-fill.pulse {
+    animation: pulse-bar 0.3s ease-in-out infinite alternate;
+  }
+  @keyframes pulse-bar {
+    from { opacity: 1; }
+    to { opacity: 0.6; }
+  }
+
+  /* Big counters */
+  .counters {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .counter-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    transition: border-color 0.3s;
+  }
+  .counter-card.active { border-color: var(--green); }
+  .counter-card.warning { border-color: var(--yellow); }
+  .counter-card.danger { border-color: var(--red); }
+  .counter-val {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .counter-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    border: 1px solid;
+    transition: all 0.3s;
+  }
+  .status-bar.idle {
+    background: rgba(59,130,246,0.08);
+    border-color: rgba(59,130,246,0.25);
+    color: var(--blue);
+  }
+  .status-bar.running {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.25);
+    color: var(--green);
+  }
+  .status-bar.warning {
+    background: rgba(234,179,8,0.08);
+    border-color: rgba(234,179,8,0.35);
+    color: var(--yellow);
+  }
+  .status-bar.killed {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.4);
+    color: var(--red);
+  }
+  .status-bar.complete {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.3);
+    color: var(--green);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .status-dot.blink {
+    animation: blink 0.8s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* Agent conversation log */
+  .log {
+    height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+    margin-bottom: 16px;
+  }
+  .log::-webkit-scrollbar { width: 4px; }
+  .log::-webkit-scrollbar-track { background: transparent; }
+  .log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-entry {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    animation: slide-in 0.2s ease;
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .log-entry.user { background: rgba(59,130,246,0.07); border-left: 2px solid var(--blue); }
+  .log-entry.agent { background: rgba(34,197,94,0.06); border-left: 2px solid var(--green); }
+  .log-entry.tool { background: rgba(168,85,247,0.07); border-left: 2px solid var(--purple); }
+  .log-entry.system { background: rgba(125,133,144,0.07); border-left: 2px solid var(--muted); }
+  .log-entry.error { background: rgba(239,68,68,0.08); border-left: 2px solid var(--red); }
+  .log-entry.warn { background: rgba(234,179,8,0.08); border-left: 2px solid var(--yellow); }
+  .log-entry.kill { background: rgba(239,68,68,0.15); border-left: 2px solid var(--red); font-weight: 600; }
+  .log-role {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    min-width: 50px;
+    padding-top: 1px;
+    flex-shrink: 0;
+  }
+  .log-msg { color: var(--text); flex: 1; }
+  .log-tokens {
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  /* Kill banner */
+  .kill-banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.08) 100%);
+    border: 1px solid rgba(239,68,68,0.5);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    animation: flash-in 0.4s ease;
+  }
+  @keyframes flash-in {
+    0% { opacity: 0; transform: scale(0.97); }
+    30% { opacity: 1; transform: scale(1.01); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .kill-banner.visible { display: block; }
+  .kill-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--red);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .kill-title svg { flex-shrink: 0; }
+  .kill-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .kill-stat {
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .kill-stat-val { font-size: 18px; font-weight: 700; }
+  .kill-stat-val.saved { color: var(--green); }
+  .kill-stat-val.used { color: var(--red); }
+  .kill-stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Incident report */
+  .incident-report {
+    display: none;
+    margin-top: 16px;
+  }
+  .incident-report.visible { display: block; }
+  .report-section { margin-bottom: 14px; }
+  .report-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .report-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 4px 0;
+    color: var(--muted);
+  }
+  .report-row span:last-child { color: var(--text); }
+
+  pre.config-snippet {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 11px;
+    color: var(--green);
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    outline: none;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+  }
+  .btn-primary:hover { background: #16a34a; }
+  .btn-primary:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; transform: none; }
+  .btn-danger {
+    background: rgba(239,68,68,0.15);
+    color: var(--red);
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--blue); }
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Sparkline */
+  .sparkline-wrap {
+    height: 40px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  canvas#spark {
+    width: 100%;
+    height: 40px;
+    display: block;
+  }
+
+  /* Scenario selector */
+  .scenario-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: var(--surface2);
+    transition: all 0.15s;
+    margin: 3px 3px 3px 0;
+  }
+  .scenario-tag.active {
+    background: rgba(59,130,246,0.12);
+    border-color: rgba(59,130,246,0.4);
+    color: var(--blue);
+  }
+  .scenario-tag:hover:not(.active) {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  /* Risk label */
+  .risk-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .risk-chip.low { background: rgba(34,197,94,0.12); color: var(--green); }
+  .risk-chip.medium { background: rgba(234,179,8,0.12); color: var(--yellow); }
+  .risk-chip.high { background: rgba(249,115,22,0.12); color: var(--orange); }
+  .risk-chip.critical { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  .footnote {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .footnote a { color: var(--blue); text-decoration: none; }
+  .footnote a:hover { text-decoration: underline; }
+
+  .iteration-ticker {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Agent<span>Budget</span> <span class="badge">KILL SWITCH</span></h1>
+  <div class="tagline">Real-time token spend guardrail for autonomous AI agents · Stop runaway before it hits your bill</div>
+</div>
+
+<div class="grid">
+
+  <!-- LEFT PANEL: Config -->
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title"><div class="dot" style="background:var(--blue)"></div> Budget Configuration</div>
+
+      <div class="config-row">
+        <div class="config-label">Max Tokens <span id="lbl-tokens">100,000</span></div>
+        <input type="range" id="cfg-tokens" min="10000" max="1000000" step="10000" value="100000"
+               oninput="updateTokenLabel(this.value)">
+      </div>
+
+      <div class="config-row">
+        <div class="config-label">Max Spend (USD) <span id="lbl-spend">$50.00</span></div>
+        <input type="range" id="cfg-spend" min="1" max="500" step="1" value="50"
+               oninput="updateSpendLabel(this.value)">
+      </div>
+
+      <div class="config-row">
+        <div class="config-label">Max Iterations <span id="lbl-iter">25</span></div>
+        <input type="range" id="cfg-iter" min="5" max="100" step="5" value="25"
+               oninput="updateIterLabel(this.value)">
+      </div>
+
+      <div class="config-row">
+        <div class="config-label">Warn at <span id="lbl-warn">80%</span> of budget</div>
+        <input type="range" id="cfg-warn" min="50" max="95" step="5" value="80"
+               oninput="updateWarnLabel(this.value)">
+      </div>
+
+      <div class="config-row" style="margin-bottom:0;">
+        <div class="config-label">Model (cost per 1M tokens)</div>
+        <select id="cfg-model" class="config-input" onchange="updateModelCost()">
+          <option value="3.00" selected>claude-opus-4-8 — $3.00/1M</option>
+          <option value="1.00">claude-sonnet-5 — $1.00/1M</option>
+          <option value="0.25">claude-haiku-4-5 — $0.25/1M</option>
+          <option value="5.00">gpt-4o — $5.00/1M</option>
+          <option value="2.00">gpt-4o-mini — $2.00/1M</option>
+          <option value="15.00">o3 — $15.00/1M</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title"><div class="dot" style="background:var(--orange)"></div> Scenario</div>
+
+      <div style="margin-bottom:10px;">
+        <div class="scenario-tag active" onclick="selectScenario('infinite')" id="s-infinite">∞ Infinite Retry Loop</div>
+        <div class="scenario-tag" onclick="selectScenario('deep')" id="s-deep">🔍 Deep Research Spiral</div>
+        <div class="scenario-tag" onclick="selectScenario('tool')" id="s-tool">🔧 Tool Call Explosion</div>
+      </div>
+
+      <div id="scenario-desc" style="font-size:12px; color:var(--muted); line-height:1.5;">
+        Customer support agent stuck in an error retry loop. API returns 503. Agent retries indefinitely.
+        <span class="risk-chip critical" style="margin-left:6px;">critical risk</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><div class="dot" style="background:var(--green)"></div> Guardrail Status</div>
+
+      <div class="guardrail">
+        <div class="guardrail-header">
+          <span class="guardrail-name">Token Consumption</span>
+          <span class="guardrail-value" id="g-token-val">0 / 100K</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill safe" id="g-token-bar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="guardrail">
+        <div class="guardrail-header">
+          <span class="guardrail-name">USD Spend</span>
+          <span class="guardrail-value" id="g-spend-val">$0.00 / $50.00</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill safe" id="g-spend-bar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="guardrail">
+        <div class="guardrail-header">
+          <span class="guardrail-name">Iteration Count</span>
+          <span class="guardrail-value" id="g-iter-val">0 / 25</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill safe" id="g-iter-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Live Run -->
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title"><div class="dot" style="background:var(--green)" id="run-dot"></div> Live Agent Run</div>
+
+      <!-- Status bar -->
+      <div class="status-bar idle" id="status-bar">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-msg">Ready to run — configure guardrails and press Start</span>
+        <span class="iteration-ticker" id="iter-ticker" style="margin-left:auto;">iter: <strong id="iter-num">0</strong></span>
+      </div>
+
+      <!-- Counters -->
+      <div class="counters">
+        <div class="counter-card" id="cnt-tokens">
+          <div class="counter-val" id="cnt-tokens-val">0</div>
+          <div class="counter-label">Tokens Used</div>
+        </div>
+        <div class="counter-card" id="cnt-spend">
+          <div class="counter-val" id="cnt-spend-val">$0.00</div>
+          <div class="counter-label">USD Spent</div>
+        </div>
+        <div class="counter-card" id="cnt-vel">
+          <div class="counter-val" id="cnt-vel-val">—</div>
+          <div class="counter-label">Tok/s</div>
+        </div>
+      </div>
+
+      <!-- Sparkline -->
+      <div class="sparkline-wrap">
+        <canvas id="spark"></canvas>
+      </div>
+
+      <!-- Conversation log -->
+      <div class="log" id="log"></div>
+
+      <!-- Buttons -->
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-start" onclick="startRun()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Start Agent Run
+        </button>
+        <button class="btn btn-danger" id="btn-kill" onclick="manualKill()" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4 14H8V8h8v8z"/></svg>
+          Manual Kill
+        </button>
+        <button class="btn btn-secondary" onclick="resetAll()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Kill Banner -->
+    <div class="kill-banner" id="kill-banner">
+      <div class="kill-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--red)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        KILL SWITCH TRIGGERED — Agent Terminated
+      </div>
+      <div style="font-size:12px; color:var(--muted);" id="kill-reason">Token budget exceeded.</div>
+      <div class="kill-stats" id="kill-stats">
+        <div class="kill-stat">
+          <div class="kill-stat-val used" id="ks-used">—</div>
+          <div class="kill-stat-label">Tokens consumed</div>
+        </div>
+        <div class="kill-stat">
+          <div class="kill-stat-val used" id="ks-cost">—</div>
+          <div class="kill-stat-label">Cost at kill</div>
+        </div>
+        <div class="kill-stat">
+          <div class="kill-stat-val saved" id="ks-saved">—</div>
+          <div class="kill-stat-label">Estimated saved</div>
+        </div>
+        <div class="kill-stat">
+          <div class="kill-stat-val" id="ks-iter">—</div>
+          <div class="kill-stat-label">Iterations completed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incident Report -->
+    <div class="incident-report panel" id="incident-report">
+      <div class="panel-title"><div class="dot" style="background:var(--red)"></div> Incident Report</div>
+
+      <div class="report-section">
+        <div class="report-section-title">Run Summary</div>
+        <div class="report-row"><span>Agent task</span><span id="rpt-task">—</span></div>
+        <div class="report-row"><span>Termination trigger</span><span id="rpt-trigger" style="color:var(--red)">—</span></div>
+        <div class="report-row"><span>Root cause</span><span id="rpt-cause">—</span></div>
+        <div class="report-row"><span>Duration</span><span id="rpt-dur">—</span></div>
+        <div class="report-row"><span>Tokens at kill</span><span id="rpt-tok">—</span></div>
+        <div class="report-row"><span>Cost at kill</span><span id="rpt-cost">—</span></div>
+        <div class="report-row"><span>Projected cost (unguarded)</span><span id="rpt-proj" style="color:var(--red)">—</span></div>
+      </div>
+
+      <div class="report-section">
+        <div class="report-section-title">Prevention Config (apply to agent init)</div>
+        <pre class="config-snippet" id="config-snippet">// loading...</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footnote">
+  AgentBudget · Built by <a href="https://github.com/RLASAF12" target="_blank">RLASAF12</a> ·
+  Inspired by the "$47→$5,847 in 58 minutes" incident (DEV.to, 2026-07-06) ·
+  <a href="https://github.com/RLASAF12/agent-budget" target="_blank">View on GitHub</a>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let running = false;
+let killed = false;
+let timer = null;
+let tokens = 0;
+let spend = 0;
+let iters = 0;
+let startTime = null;
+let sparkData = [];
+let lastTickTokens = 0;
+let scenarioKey = 'infinite';
+let costPerToken = 3.00 / 1_000_000; // default: opus
+
+// Config getters
+const maxTokens  = () => parseInt(document.getElementById('cfg-tokens').value);
+const maxSpend   = () => parseFloat(document.getElementById('cfg-spend').value);
+const maxIter    = () => parseInt(document.getElementById('cfg-iter').value);
+const warnAt     = () => parseInt(document.getElementById('cfg-warn').value) / 100;
+
+// ─── Label updaters ───────────────────────────────────────────────────────────
+function updateTokenLabel(v) {
+  document.getElementById('lbl-tokens').textContent = Number(v).toLocaleString();
+  if (!running) updateGuardrailLabels();
+}
+function updateSpendLabel(v) {
+  document.getElementById('lbl-spend').textContent = '$' + parseFloat(v).toFixed(2);
+  if (!running) updateGuardrailLabels();
+}
+function updateIterLabel(v) {
+  document.getElementById('lbl-iter').textContent = v;
+  if (!running) updateGuardrailLabels();
+}
+function updateWarnLabel(v) {
+  document.getElementById('lbl-warn').textContent = v + '%';
+}
+function updateModelCost() {
+  costPerToken = parseFloat(document.getElementById('cfg-model').value) / 1_000_000;
+}
+function updateGuardrailLabels() {
+  document.getElementById('g-token-val').textContent = `0 / ${maxTokens().toLocaleString()}`;
+  document.getElementById('g-spend-val').textContent = `$0.00 / $${maxSpend().toFixed(2)}`;
+  document.getElementById('g-iter-val').textContent  = `0 / ${maxIter()}`;
+}
+
+// ─── Scenarios ────────────────────────────────────────────────────────────────
+const scenarios = {
+  infinite: {
+    desc: 'Customer support agent stuck in an error retry loop. API returns 503. Agent retries indefinitely.',
+    risk: 'critical',
+    task: 'Resolve order #12847 — customer says it never arrived',
+    tokensPerIter: (i) => 3200 + i * 800 + Math.random() * 600,
+    messages: [
+      { role:'user',   msg:'Check status of order #12847 for me.', tok:28 },
+      { role:'agent',  msg:'I\'ll look that up right away.', tok:12 },
+      { role:'tool',   msg:'→ order_status(id=12847)', tok:45 },
+      { role:'error',  msg:'503 Service Unavailable. Upstream timeout.', tok:22 },
+      { role:'agent',  msg:'There seems to be a temporary issue. Let me retry.', tok:31 },
+      { role:'tool',   msg:'→ order_status(id=12847) [retry 1]', tok:47 },
+      { role:'error',  msg:'503 Service Unavailable. Upstream timeout.', tok:22 },
+      { role:'agent',  msg:'Still experiencing issues. Attempting again with exponential backoff...', tok:38 },
+      { role:'tool',   msg:'→ order_status(id=12847) [retry 2]', tok:47 },
+      { role:'error',  msg:'503 Service Unavailable. Upstream timeout.', tok:22 },
+      { role:'agent',  msg:'I\'ll try a different approach and query the fulfillment system directly.', tok:41 },
+      { role:'tool',   msg:'→ fulfillment_lookup(order=12847, fallback=true)', tok:52 },
+      { role:'error',  msg:'ConnectionError: fulfillment.internal:5432 unreachable.', tok:35 },
+      { role:'agent',  msg:'Both systems are down. I\'ll query the archive database.', tok:33 },
+      { role:'tool',   msg:'→ archive_db.query(SELECT * FROM orders WHERE id=12847)', tok:58 },
+      { role:'error',  msg:'READ_TIMEOUT: archive query exceeded 30s.', tok:28 },
+      { role:'agent',  msg:'Archive timeout. Retrying with simplified query...', tok:31 },
+      { role:'tool',   msg:'→ order_status(id=12847) [retry 3] [no-cache]', tok:49 },
+      { role:'error',  msg:'503 Service Unavailable. Upstream timeout.', tok:22 },
+      { role:'warn',   msg:'⚠ Token budget approaching 80% threshold', tok:0 },
+      { role:'agent',  msg:'System instability detected. Escalating to warehouse API.', tok:37 },
+      { role:'tool',   msg:'→ warehouse_api(shipment_search, order_ref=12847)', tok:53 },
+      { role:'error',  msg:'AuthenticationError: token expired. Requesting new token...', tok:40 },
+      { role:'agent',  msg:'Re-authenticating and retrying warehouse lookup.', tok:29 },
+      { role:'tool',   msg:'→ auth.refresh() → warehouse_api(order=12847)', tok:55 },
+      { role:'error',  msg:'503 Service Unavailable. Upstream timeout.', tok:22 },
+    ],
+    rootCause: 'Unguarded retry loop — no max_retries limit. All upstream services degraded simultaneously.',
+    projected: 47 // what it would have cost ($47 → $5847)
+  },
+  deep: {
+    desc: 'Research agent exploring a broad question, spawning sub-queries recursively until budget exhausted.',
+    risk: 'high',
+    task: 'Summarize the competitive landscape of AI infrastructure tooling in 2026',
+    tokensPerIter: (i) => 5500 + i * 1200 + Math.random() * 800,
+    messages: [
+      { role:'user',  msg:'Give me a competitive landscape report on AI infra tooling.', tok:24 },
+      { role:'agent', msg:'Starting deep research. Querying across 6 domains...', tok:22 },
+      { role:'tool',  msg:'→ web_search("AI infrastructure tooling 2026 market")', tok:48 },
+      { role:'agent', msg:'Found 23 sources. Expanding on LLM serving layer...', tok:31 },
+      { role:'tool',  msg:'→ web_search("LLM serving vLLM TensorRT-LLM comparison 2026")', tok:54 },
+      { role:'agent', msg:'Expanding on orchestration layer — found 8 new entrants...', tok:35 },
+      { role:'tool',  msg:'→ web_search("LangChain vs LlamaIndex vs custom 2026")', tok:50 },
+      { role:'agent', msg:'Also need to cover observability. Checking Langfuse, Phoenix, Helicone...', tok:40 },
+      { role:'tool',  msg:'→ fetch_url(langfuse.com/pricing) → fetch_url(phoenix.arize.com)', tok:62 },
+      { role:'agent', msg:'Found 4 emerging vector DB providers. Need comparative analysis.', tok:38 },
+      { role:'tool',  msg:'→ web_search("Pinecone Weaviate Qdrant Chroma comparison 2026")', tok:55 },
+      { role:'agent', msg:'Cross-referencing funding rounds and team sizes for credibility...', tok:37 },
+      { role:'tool',  msg:'→ fetch_url(crunchbase.com/org/...) × 7 companies', tok:71 },
+      { role:'warn',  msg:'⚠ 80% token threshold reached — still generating...', tok:0 },
+      { role:'agent', msg:'Now analyzing pricing models across 12 providers...', tok:34 },
+      { role:'tool',  msg:'→ fetch_url(pricing pages) × 12 concurrent requests', tok:80 },
+      { role:'agent', msg:'Compiling token economics section. Need 2025 usage data...', tok:39 },
+      { role:'tool',  msg:'→ web_search("Anthropic OpenAI token pricing trends 2025 2026")', tok:56 },
+    ],
+    rootCause: 'Unbounded sub-query spawning. Agent treats "comprehensive" as permission to search indefinitely.',
+    projected: 280
+  },
+  tool: {
+    desc: 'Coding agent calling tools in a tight loop: read file → modify → write → verify → read again.',
+    risk: 'high',
+    task: 'Refactor authentication module across 40+ files',
+    tokensPerIter: (i) => 4100 + i * 950 + Math.random() * 700,
+    messages: [
+      { role:'user',  msg:'Refactor the auth module — replace JWT with session tokens.', tok:21 },
+      { role:'agent', msg:'Starting codebase scan. Reading all files...', tok:18 },
+      { role:'tool',  msg:'→ read_file(src/auth/jwt.ts) [2,847 tokens]', tok:62 },
+      { role:'tool',  msg:'→ read_file(src/middleware/auth.ts) [3,201 tokens]', tok:65 },
+      { role:'tool',  msg:'→ read_file(src/routes/login.ts) [1,938 tokens]', tok:58 },
+      { role:'agent', msg:'Found 14 JWT references. Beginning replacements...', tok:29 },
+      { role:'tool',  msg:'→ write_file(src/auth/session.ts) — creating new module', tok:70 },
+      { role:'tool',  msg:'→ read_file(src/auth/jwt.ts) — re-reading to verify diff', tok:62 },
+      { role:'agent', msg:'Detected 3 remaining references. Checking consumers...', tok:32 },
+      { role:'tool',  msg:'→ grep_codebase(pattern="jwt|JWT|JsonWebToken") → 31 matches', tok:75 },
+      { role:'agent', msg:'Need to update each match individually. Processing...', tok:30 },
+      { role:'tool',  msg:'→ read_file × 8 more files [avg 2,400 tok each]', tok:88 },
+      { role:'tool',  msg:'→ write_file × 8 updated files', tok:72 },
+      { role:'warn',  msg:'⚠ 80% token threshold reached — still processing...', tok:0 },
+      { role:'agent', msg:'Verifying changes didn\'t break imports. Re-reading all modified files...', tok:41 },
+      { role:'tool',  msg:'→ read_file × 12 files [verification pass]', tok:90 },
+      { role:'agent', msg:'Found 2 circular imports introduced. Fixing...', tok:28 },
+      { role:'tool',  msg:'→ read_file(src/index.ts) [root module — 5,200 tokens]', tok:78 },
+    ],
+    rootCause: 'Read-after-write verification loop. Each write spawns a re-read, spawning more writes.',
+    projected: 890
+  }
+};
+
+let currentScenario = scenarios.infinite;
+let msgIdx = 0;
+
+function selectScenario(key) {
+  if (running) return;
+  scenarioKey = key;
+  currentScenario = scenarios[key];
+  document.querySelectorAll('.scenario-tag').forEach(t => t.classList.remove('active'));
+  document.getElementById('s-' + key).classList.add('active');
+  const riskMap = { low:'low', medium:'medium', high:'high', critical:'critical' };
+  document.getElementById('scenario-desc').innerHTML =
+    currentScenario.desc + ` <span class="risk-chip ${currentScenario.risk}" style="margin-left:6px;">${currentScenario.risk} risk</span>`;
+}
+
+// ─── Sparkline ─────────────────────────────────────────────────────────────────
+function drawSparkline() {
+  const canvas = document.getElementById('spark');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = 40;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  if (sparkData.length < 2) return;
+
+  const max = Math.max(...sparkData, 1);
+  const pts = sparkData.map((v, i) => ({
+    x: (i / (sparkData.length - 1)) * W,
+    y: H - (v / max) * (H - 4) - 2
+  }));
+
+  // Color based on last value ratio
+  const ratio = tokens / maxTokens();
+  const color = ratio < warnAt() ? '#22c55e' : ratio < 0.95 ? '#eab308' : '#ef4444';
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, H);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, H);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// ─── Run loop ─────────────────────────────────────────────────────────────────
+function startRun() {
+  if (running) return;
+  running = true;
+  killed = false;
+  tokens = 0; spend = 0; iters = 0;
+  sparkData = []; msgIdx = 0;
+  startTime = Date.now();
+  lastTickTokens = 0;
+
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('kill-banner').classList.remove('visible');
+  document.getElementById('incident-report').classList.remove('visible');
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-kill').disabled = false;
+
+  setStatus('running', 'Agent running — monitoring guardrails...');
+  document.getElementById('run-dot').style.background = 'var(--green)';
+
+  // Add initial system message
+  addLog('system', 'AgentBudget guardrail ACTIVE', `max:${maxTokens().toLocaleString()} tok / $${maxSpend()} / ${maxIter()} iter`, null, 'system');
+
+  setTimeout(tick, 400);
+}
+
+function tick() {
+  if (!running || killed) return;
+
+  // Advance iteration
+  iters++;
+  const iterTok = Math.round(currentScenario.tokensPerIter(iters));
+  tokens += iterTok;
+  spend = tokens * costPerToken;
+  sparkData.push(tokens);
+  if (sparkData.length > 50) sparkData.shift();
+
+  const tRatio = tokens / maxTokens();
+  const sRatio = spend / maxSpend();
+  const iRatio = iters / maxIter();
+  const maxRatio = Math.max(tRatio, sRatio, iRatio);
+
+  // Emit log messages for this iteration
+  const msgs = currentScenario.messages;
+  const batch = Math.min(2, msgs.length - msgIdx);
+  for (let j = 0; j < batch; j++) {
+    const m = msgs[msgIdx % msgs.length];
+    msgIdx++;
+    if (m.tok === 0 && maxRatio < warnAt()) return; // skip warning if not at threshold
+    addLog(m.role, m.msg, m.tok ? `+${m.tok} tok` : '', null, m.role);
+  }
+  if (msgIdx >= msgs.length) msgIdx = 0; // loop messages
+
+  // Update counters
+  updateCounters(tRatio, sRatio, iRatio);
+  updateGuardrails(tRatio, sRatio, iRatio);
+  drawSparkline();
+
+  // Velocity
+  const elapsed = (Date.now() - startTime) / 1000;
+  const vel = elapsed > 0 ? Math.round(tokens / elapsed) : 0;
+  document.getElementById('cnt-vel-val').textContent = vel.toLocaleString();
+  document.getElementById('iter-num').textContent = iters;
+
+  // Status transitions
+  if (maxRatio >= warnAt() && maxRatio < 1.0) {
+    setStatus('warning', `⚠ Approaching limit — ${Math.round(maxRatio*100)}% of budget consumed`);
+  }
+
+  // Kill checks
+  if (tRatio >= 1.0) { triggerKill('token', tRatio, sRatio, iRatio); return; }
+  if (sRatio >= 1.0) { triggerKill('spend', tRatio, sRatio, iRatio); return; }
+  if (iRatio >= 1.0) { triggerKill('iteration', tRatio, sRatio, iRatio); return; }
+
+  // Dynamic interval — speeds up as ratio grows (simulates acceleration)
+  const delay = Math.max(150, 600 - maxRatio * 450);
+  timer = setTimeout(tick, delay);
+}
+
+function triggerKill(trigger, tR, sR, iR) {
+  running = false;
+  killed = true;
+  clearTimeout(timer);
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const projMultiplier = currentScenario.projected;
+  const projCost = (projMultiplier * spend).toFixed(2);
+  const saved = (projMultiplier * spend - spend).toFixed(2);
+
+  const triggerMsg = {
+    token: `Token budget exceeded (${tokens.toLocaleString()} / ${maxTokens().toLocaleString()} tokens)`,
+    spend: `Spend limit exceeded ($${spend.toFixed(2)} / $${maxSpend().toFixed(2)})`,
+    iteration: `Iteration limit exceeded (${iters} / ${maxIter()} iterations)`
+  }[trigger];
+
+  // Kill log entry
+  addLog('kill', '🔴 KILL SWITCH TRIGGERED — ' + triggerMsg, '', null, 'kill');
+
+  // Update UI
+  setStatus('killed', `KILLED — ${triggerMsg}`);
+  document.getElementById('run-dot').style.background = 'var(--red)';
+  document.getElementById('btn-kill').disabled = true;
+  document.getElementById('btn-start').disabled = false;
+
+  // Kill banner
+  document.getElementById('kill-reason').textContent = 'Guardrail triggered: ' + triggerMsg;
+  document.getElementById('ks-used').textContent = tokens.toLocaleString() + ' tok';
+  document.getElementById('ks-cost').textContent = '$' + spend.toFixed(2);
+  document.getElementById('ks-saved').textContent = '~$' + saved;
+  document.getElementById('ks-iter').textContent = iters + ' iterations';
+  document.getElementById('kill-banner').classList.add('visible');
+
+  // Incident report
+  document.getElementById('rpt-task').textContent = currentScenario.task;
+  document.getElementById('rpt-trigger').textContent = triggerMsg;
+  document.getElementById('rpt-cause').textContent = currentScenario.rootCause;
+  document.getElementById('rpt-dur').textContent = elapsed + 's';
+  document.getElementById('rpt-tok').textContent = tokens.toLocaleString();
+  document.getElementById('rpt-cost').textContent = '$' + spend.toFixed(2);
+  document.getElementById('rpt-proj').textContent = '~$' + projCost + ' (est. without guardrail)';
+
+  const model = document.getElementById('cfg-model').options[document.getElementById('cfg-model').selectedIndex].value;
+  document.getElementById('config-snippet').textContent = JSON.stringify({
+    guardrails: {
+      max_tokens: maxTokens(),
+      max_spend_usd: maxSpend(),
+      max_iterations: maxIter(),
+      warn_at_pct: Math.round(warnAt() * 100),
+      on_trigger: "kill_and_report"
+    },
+    incident: {
+      trigger: trigger,
+      tokens_at_kill: tokens,
+      cost_at_kill: parseFloat(spend.toFixed(2)),
+      root_cause: currentScenario.rootCause.split('.')[0]
+    }
+  }, null, 2);
+
+  document.getElementById('incident-report').classList.add('visible');
+}
+
+function manualKill() {
+  if (!running) return;
+  triggerKill('spend',
+    tokens / maxTokens(),
+    spend / maxSpend(),
+    iters / maxIter()
+  );
+}
+
+function resetAll() {
+  clearTimeout(timer);
+  running = false; killed = false;
+  tokens = 0; spend = 0; iters = 0;
+  sparkData = []; msgIdx = 0;
+
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('kill-banner').classList.remove('visible');
+  document.getElementById('incident-report').classList.remove('visible');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-kill').disabled = true;
+
+  setStatus('idle', 'Ready to run — configure guardrails and press Start');
+  document.getElementById('run-dot').style.background = 'var(--green)';
+  document.getElementById('iter-num').textContent = '0';
+
+  updateCounters(0, 0, 0);
+  updateGuardrails(0, 0, 0);
+  updateGuardrailLabels();
+  drawSparkline();
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function setStatus(cls, msg) {
+  const bar = document.getElementById('status-bar');
+  const dot = document.getElementById('status-dot');
+  bar.className = 'status-bar ' + cls;
+  document.getElementById('status-msg').textContent = msg;
+  dot.className = 'status-dot' + (cls === 'running' || cls === 'warning' ? ' blink' : '');
+}
+
+function addLog(role, msg, tokenStr, note, type) {
+  const log = document.getElementById('log');
+  const entry = document.createElement('div');
+  const typeClass = {
+    user:'user', agent:'agent', tool:'tool', system:'system',
+    error:'error', warn:'warn', kill:'kill'
+  }[type] || 'system';
+  entry.className = 'log-entry ' + typeClass;
+
+  const roleLabels = {
+    user:'user', agent:'agent', tool:'tool', system:'sys',
+    error:'error', warn:'warn', kill:'kill'
+  };
+  entry.innerHTML = `
+    <span class="log-role">${roleLabels[role] || role}</span>
+    <span class="log-msg">${msg}</span>
+    ${tokenStr ? `<span class="log-tokens">${tokenStr}</span>` : ''}
+  `;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+function updateCounters(tR, sR, iR) {
+  document.getElementById('cnt-tokens-val').textContent = tokens.toLocaleString();
+  document.getElementById('cnt-spend-val').textContent  = '$' + spend.toFixed(2);
+
+  const getClass = r => r >= 1.0 ? 'danger' : r >= warnAt() ? 'warning' : 'active';
+  document.getElementById('cnt-tokens').className = 'counter-card ' + getClass(tR);
+  document.getElementById('cnt-spend').className  = 'counter-card ' + getClass(sR);
+  document.getElementById('cnt-vel').className    = 'counter-card active';
+}
+
+function updateGuardrails(tR, sR, iR) {
+  const setBar = (barId, valId, pct, current, max, prefix) => {
+    const bar = document.getElementById(barId);
+    bar.style.width = Math.min(pct * 100, 100) + '%';
+    const cls = pct >= 1.0 ? 'critical pulse' : pct >= warnAt() ? 'danger' : pct >= warnAt() * 0.8 ? 'warn' : 'safe';
+    bar.className = 'bar-fill ' + cls;
+    document.getElementById(valId).textContent = prefix + current + ' / ' + max;
+  };
+
+  setBar('g-token-bar', 'g-token-val', tR,
+    tokens.toLocaleString(), maxTokens().toLocaleString(), '');
+  setBar('g-spend-bar', 'g-spend-val', sR,
+    '$' + spend.toFixed(2), '$' + maxSpend().toFixed(2), '');
+  setBar('g-iter-bar', 'g-iter-val', iR,
+    iters, maxIter(), '');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', drawSparkline);
+updateGuardrailLabels();
+drawSparkline();
+</script>
+</body>
+</html>
