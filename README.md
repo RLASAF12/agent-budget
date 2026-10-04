@@ -1,3 +1,5 @@
+> **Archived.** This repo moved to [RLASAF12/agent-guardrails](https://github.com/RLASAF12/agent-guardrails/tree/main/agent-budget) (folder `agent-budget/`, full history preserved). Archived 2026-10-04.
+
 # AgentBudget
 
 > Real-time token spend guardrail for autonomous AI agents.  
